@@ -43,31 +43,46 @@ mongoose.connect('mongodb://localhost/chatUsers');
 //user constructor
 var User = mongoose.model('User', {name : String});
 
+var userObj = {};
+
 //If the client just connected
 io.sockets.on('connection', function (socket) {
 	console.log('Hello from Socket.io, I\'m connected with the client');
 
 	//username
 	socket.on('username', function (username){
-		io.sockets.emit('username', username);
+		if(userObj[socket.id]){
+			io.sockets.emit('usernameChange', 
+				{
+					oldUsername : userObj[socket.id],
+					newUsername : username
+				});
+		}
+		else{
+			io.sockets.emit('username', username);
+		}
+		userObj[socket.id] = username;
+		io.sockets.emit('users', userObj);
+	});
 
-		//message object
-		socket.on('message', function (message){
-			var msgObj = {
-					message: message,
-					senderid: socket.id,
-					username: username
-				}
-			io.sockets.socket(message.clientid).emit('message',
-				msgObj);
-				console.log(msgObj);
-			io.sockets.emit('message', msgObj);
-			
-			//disconnect
-			socket.on('disconnect', function (){
-				io.sockets.emit('disconnect', username);
-			});
-		});
+	//message object
+	socket.on('message', function (message){
+		var msgObj = {
+				message: message,
+				senderid: socket.id,
+				username: userObj[socket.id]
+			}
+		io.sockets.socket(message.clientid).emit('message',
+			msgObj);
+			console.log(msgObj);
+		io.sockets.emit('message', msgObj);
+	});
+
+	//disconnect
+	socket.on('disconnect', function (){
+		io.sockets.emit('disconnect', userObj[socket.id]);
+		delete userObj[socket.id];
+		io.sockets.emit('users', userObj);
 	});
 });
 
