@@ -8,7 +8,8 @@ var routes = require('./routes');
 var user = require('./routes/user');
 var http = require('http');
 var path = require('path');
-var socketio = require('socket.io')
+var socketio = require('socket.io');
+var mongoose = require('mongoose');
 var app = express();
 
 // all environments
@@ -36,21 +37,38 @@ var server = http.createServer(app)
 //Start the web socket server
 var io = socketio.listen(server);
 
-var users = {
-	'name': 'Richard'
-}
+//connect mongoose
+mongoose.connect('mongodb://localhost/chatUsers');
+
+//user constructor
+var User = mongoose.model('User', {name : String});
 
 //If the client just connected
-io.sockets.on('connection', function(socket) {
+io.sockets.on('connection', function (socket) {
 	console.log('Hello from Socket.io, I\'m connected with the client');
-	//socket.emit('username', users);
-	
-	socket.on('message', function(message){
-		io.sockets.emit('message', message);
-		//socket.broadcast.emit('message', message);
-		console.log(message);
-	});
 
+	//username
+	socket.on('username', function (username){
+		io.sockets.emit('username', username);
+
+		//message object
+		socket.on('message', function (message){
+			var msgObj = {
+					message: message,
+					senderid: socket.id,
+					username: username
+				}
+			io.sockets.socket(message.clientid).emit('message',
+				msgObj);
+				console.log(msgObj);
+			io.sockets.emit('message', msgObj);
+			
+			//disconnect
+			socket.on('disconnect', function (){
+				io.sockets.emit('disconnect', username);
+			});
+		});
+	});
 });
 
 server.listen(3000, function(){
